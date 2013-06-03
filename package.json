@@ -16,9 +16,15 @@
     "min-stream"
   ],
   "dependencies": {
-    "js-git": "*"
+    "commander": "~1.1.1",
+    "min-stream-node": "0.0.1",
+    "git-fetch": "0.0.0",
+    "git-pkt-line": "0.0.1",
+    "git-list-pack": "0.0.10",
+    "min-stream": "0.0.4",
+    "git-hydrate-pack": "0.0.3"
   },
-  "devDependencies": {}.
+  "devDependencies": {},
   "author": "Tim Caswell <tim@creationix.com>",
   "license": "MIT",
   "bugs": {
