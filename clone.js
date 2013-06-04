@@ -66,8 +66,6 @@ function onStream(err, sources) {
   consume(sources.line);
   streamToSink(process.stdout, false)(sources.progress);
   streamToSink(process.stderr, false)(sources.error);
-  // consume(sources.progress, function (item, callback) { process.stdout.write(item, callback); });
-  // consume(sources.error, function (item, callback) { process.stderr.write(item, callback); });
   var total;
   var num = 0;
   consume(sources.objects, function (object, callback) {
