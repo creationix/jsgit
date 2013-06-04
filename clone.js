@@ -11,6 +11,7 @@ var mkdirp = require('mkdirp');
 var fs = require('fs');
 var zlib = require('zlib');
 var bops = require('bops');
+var crypto = require('crypto')
 
 if (process.argv.length < 3) {
   console.log("Usage: %s %s repo [target]\n", process.argv[0], process.argv[1]);
@@ -43,17 +44,10 @@ tcp.connect(options.hostname, options.port, function (err, socket) {
   );
 });
 
-function writeFile(path, data, callback) {
-  if (!callback) callback = checkError;
-  mkdirp(dirname(path), function (err) {
-    if (err) return callback(err);
-    fs.writeFile(path, data, callback);
-  });
-}
 
 function onStream(err, sources) {
   if (err) throw err;
-  var gitDir = pathJoin(options.target + ".git");
+  var gitDir = pathJoin(options.target, ".git");
   var HEAD;
   Object.keys(sources.refs).forEach(function (ref) {
     var hash = sources.refs[ref];
@@ -69,24 +63,20 @@ function onStream(err, sources) {
     }
   });
   consume(sources.line);
-  consume(sources.progress, process.stdout.write.bind(process.stdout));
-  consume(sources.error, process.stderr.write.bind(process.stderr));
+  consume(sources.progress, function (item, callback) { process.stdout.write(item, callback); });
+  consume(sources.error, function (item, callback) { process.stderr.write(item, callback); });
   var total;
   var num = 0;
   consume(sources.objects, function (object, callback) {
     if (total === undefined) total = object.num + 1;
     ++num;
     process.stdout.write("Receiving objects: " + Math.round(100 * num / total) + "% (" + num + "/" + total + ")\r");
-    var dir = pathJoin(gitDir, "objects", object.hash.substr(0, 2));
-    var path = pathJoin(dir, object.hash.substr(2));
-    var body = bops.join([bops.from(object.type + " " + object.data.length + "\0"), object.data]);
-    zlib.deflate(body, function (err, data) {
-      if (err) return callback(err);
-      writeFile(path, data, callback);
-    });
+    saveObject(gitDir, object, callback);
+    // Stop reading when we've got all the objects.
+    if (num === total) return false;
   }, function (err) {
     if (err) throw err;
-    console.log("Receiving objects: 100% (" + total + "/" + total + "), done.\n");
+    console.log("Receiving objects: 100% (" + total + "/" + total + "), done.");
   });
 }
 
@@ -96,29 +86,45 @@ function checkError(err) {
 
 // Eat all events in an async stream with optional onData callback.
 function consume(read, onItem, callback) {
+  var close;
   if (!callback) {
     callback = checkError;
   }
-  read(null, onRead);
+
+  start();
+
+  function start() {
+    if (close === false) {
+      callback();
+    }
+    else if (close) {
+      read(close, callback);
+    }
+    else {
+      read(null, onRead);
+    }
+  }
+
   function onRead(err, item) {
     if (item === undefined) {
       callback(err);
     }
     else {
       if (onItem) {
-        onItem(item, onWrite);
+        close = onItem(item, onWrite);
       }
       else {
-        read(null, onRead);
+        start();
       }
     }
   }
+
   function onWrite(err) {
     if (err) {
       callback(err);
     }
     else {
-      read(null, onRead);
+      start();
     }
   }
 }
@@ -180,4 +186,47 @@ function parseObject(item) {
   };
   obj[item.type] = parsers[item.type](item);
   return obj;
+}
+
+function writeFile(path, data, callback) {
+  if (!callback) callback = checkError;
+  mkdirp(dirname(path), function (err) {
+    if (err) return callback(err);
+    fs.writeFile(path, data, callback);
+  });
+}
+
+function sha1(buf) {
+  return crypto
+    .createHash('sha1')
+    .update(buf)
+    .digest('hex')
+}
+
+function hashToPath(gitDir, hash) {
+  return pathJoin(gitDir, "objects", hash.substr(0, 2), hash.substr(2));
+}
+
+// Save an object to the git filesystem, callback(err, hash) when done
+function saveObject(gitDir, object, callback) {
+  var body = bops.join([bops.from(object.type + " " + object.data.length + "\0"), object.data]);
+  var hash = sha1(body);
+  var path = hashToPath(gitDir, hash);
+  zlib.deflate(body, function (err, data) {
+    if (err) return callback(err);
+    writeFile(path, data, function (err) {
+      if (err) return callback(err);
+      callback(null, hash);
+    });
+  });
+}
+
+
+// load a git object by hash, callback(err, object) when done
+function loadObject(gitDir, hash, callback) {
+  var path = hashToPath(gitDir, hash);
+  fs.readFile(path, function (err, body) {
+    if (err) return callback(err);
+  });
+
 }
