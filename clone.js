@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 
 var tcp = require('min-stream-node/tcp.js');
 var fetch = require('git-fetch');
@@ -75,7 +76,6 @@ function onStream(err, sources) {
   consume(sources.objects, function (object, callback) {
     if (total === undefined) total = object.num + 1;
     ++num;
-    // console.log(object);
     process.stdout.write("Receiving objects: " + Math.round(100 * num / total) + "% (" + num + "/" + total + ")\r");
     var dir = pathJoin(gitDir, "objects", object.hash.substr(0, 2));
     var path = pathJoin(dir, object.hash.substr(2));
@@ -86,7 +86,6 @@ function onStream(err, sources) {
     });
   }, function (err) {
     if (err) throw err;
-    throw "M"
     console.log("Receiving objects: 100% (" + total + "/" + total + "), done.\n");
   });
 }
@@ -115,7 +114,6 @@ function consume(read, onItem, callback) {
     }
   }
   function onWrite(err) {
-    console.log("\nonWrite", err)
     if (err) {
       callback(err);
     }
