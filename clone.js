@@ -11,7 +11,8 @@ var mkdirp = require('mkdirp');
 var fs = require('fs');
 var zlib = require('zlib');
 var bops = require('bops');
-var crypto = require('crypto')
+var crypto = require('crypto');
+var streamToSink = require('min-stream-node/common.js').streamToSink;
 
 if (process.argv.length < 3) {
   console.log("Usage: %s %s repo [target]\n", process.argv[0], process.argv[1]);
@@ -63,8 +64,10 @@ function onStream(err, sources) {
     }
   });
   consume(sources.line);
-  consume(sources.progress, function (item, callback) { process.stdout.write(item, callback); });
-  consume(sources.error, function (item, callback) { process.stderr.write(item, callback); });
+  streamToSink(process.stdout, false)(sources.progress);
+  streamToSink(process.stderr, false)(sources.error);
+  // consume(sources.progress, function (item, callback) { process.stdout.write(item, callback); });
+  // consume(sources.error, function (item, callback) { process.stderr.write(item, callback); });
   var total;
   var num = 0;
   consume(sources.objects, function (object, callback) {

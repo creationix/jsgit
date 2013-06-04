@@ -20,7 +20,7 @@
   ],
   "dependencies": {
     "commander": "~1.1.1",
-    "min-stream-node": "0.0.1",
+    "min-stream-node": "0.0.3",
     "git-fetch": "0.0.2",
     "git-pkt-line": "0.0.1",
     "git-list-pack": "0.0.10",
