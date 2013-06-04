@@ -1,11 +1,15 @@
 
 var tcp = require('min-stream-node/tcp.js');
 var fetch = require('git-fetch');
-var chain = require('min-stream/chain.js');
 var cat = require('min-stream/cat.js');
 var pktLine = require('git-pkt-line');
 var urlParse = require('url').parse;
-var pathResolve = require('path').resolve;
+var pathJoin = require('path').join;
+var dirname = require('path').dirname;
+var mkdirp = require('mkdirp');
+var fs = require('fs');
+var zlib = require('zlib');
+var bops = require('bops');
 
 if (process.argv.length < 3) {
   console.log("Usage: %s %s repo [target]\n", process.argv[0], process.argv[1]);
@@ -38,8 +42,29 @@ tcp.connect(options.hostname, options.port, function (err, socket) {
   );
 });
 
+function writeFile(path, data, callback) {
+  mkdirp(dirname(path), function (err) {
+    if (err) return callback(err);
+    fs.writeFile(path, data, callback);
+  });
+}
+
 function onStream(err, sources) {
   if (err) throw err;
+  var gitDir = pathJoin(options.target + ".git");
+  var pending = {};
+  Object.keys(sources.refs).forEach(function (ref) {
+    var hash = sources.refs[ref];
+    if (ref.substr(0, 4) !== "refs") {
+      pending[hash] = ref;
+      return;
+    }
+    if (pending[hash]) {
+      writeFile(pathJoin(gitDir, pending[hash]), "ref: " + ref + "\n");
+      delete pending[hash];
+    }
+    writeFile(pathJoin(gitDir, ref), hash + "\n");
+  });
   consume(sources.line);
   consume(sources.progress, process.stdout.write.bind(process.stdout));
   consume(sources.error, process.stderr.write.bind(process.stderr));
@@ -49,9 +74,17 @@ function onStream(err, sources) {
     var num = total - object.num;
     // console.log(object);
     process.stdout.write("Receiving objects: " + Math.round(100 * num / total) + "% (" + num + "/" + total + ")\r");
+    var dir = pathJoin(gitDir, "objects", object.hash.substr(0, 2));
+    var path = pathJoin(dir, object.hash.substr(2));
+    var body = bops.join([bops.from(object.type + " " + object.data.length + "\0"), object.data]);
+    zlib.deflate(body, function (err, data) {
+      if (err) throw err;
+      writeFile(path, data, function (err) {
+        if (err) throw err;
+      });
+    });
   }, function (err) {
     if (err) throw err;
-    throw "M"
     console.log("Receiving objects: 100% (" + total + "/" + total + "), done.\n");
   });
 }
