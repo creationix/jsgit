@@ -43,6 +43,7 @@ tcp.connect(options.hostname, options.port, function (err, socket) {
 });
 
 function writeFile(path, data, callback) {
+  if (!callback) callback = checkError;
   mkdirp(dirname(path), function (err) {
     if (err) return callback(err);
     fs.writeFile(path, data, callback);
@@ -52,57 +53,74 @@ function writeFile(path, data, callback) {
 function onStream(err, sources) {
   if (err) throw err;
   var gitDir = pathJoin(options.target + ".git");
-  var pending = {};
+  var HEAD;
   Object.keys(sources.refs).forEach(function (ref) {
     var hash = sources.refs[ref];
-    if (ref.substr(0, 4) !== "refs") {
-      pending[hash] = ref;
+    if (ref === "HEAD") {
+      HEAD = hash;
       return;
     }
-    if (pending[hash]) {
-      writeFile(pathJoin(gitDir, pending[hash]), "ref: " + ref + "\n");
-      delete pending[hash];
-    }
+    if (/\^\{\}$/.test(ref)) return;
     writeFile(pathJoin(gitDir, ref), hash + "\n");
+    if (hash === HEAD) {
+      writeFile(pathJoin(gitDir, "HEAD"), "ref: " + ref + "\n");
+      HEAD = undefined;
+    }
   });
   consume(sources.line);
   consume(sources.progress, process.stdout.write.bind(process.stdout));
   consume(sources.error, process.stderr.write.bind(process.stderr));
   var total;
-  consume(sources.objects, function (object) {
+  var num = 0;
+  consume(sources.objects, function (object, callback) {
     if (total === undefined) total = object.num + 1;
-    var num = total - object.num;
+    ++num;
     // console.log(object);
     process.stdout.write("Receiving objects: " + Math.round(100 * num / total) + "% (" + num + "/" + total + ")\r");
     var dir = pathJoin(gitDir, "objects", object.hash.substr(0, 2));
     var path = pathJoin(dir, object.hash.substr(2));
     var body = bops.join([bops.from(object.type + " " + object.data.length + "\0"), object.data]);
     zlib.deflate(body, function (err, data) {
-      if (err) throw err;
-      writeFile(path, data, function (err) {
-        if (err) throw err;
-      });
+      if (err) return callback(err);
+      writeFile(path, data, callback);
     });
   }, function (err) {
     if (err) throw err;
+    throw "M"
     console.log("Receiving objects: 100% (" + total + "/" + total + "), done.\n");
   });
 }
 
+function checkError(err) {
+  if (err) throw err;
+}
+
 // Eat all events in an async stream with optional onData callback.
 function consume(read, onItem, callback) {
+  if (!callback) {
+    callback = checkError;
+  }
   read(null, onRead);
   function onRead(err, item) {
-    if (err) {
-      if (callback) return callback(err);
-      else throw err;
-    }
-    if (item !== undefined) {
-      onItem && onItem(item);
-      read(null, onRead);
+    if (item === undefined) {
+      callback(err);
     }
     else {
-      callback && callback();
+      if (onItem) {
+        onItem(item, onWrite);
+      }
+      else {
+        read(null, onRead);
+      }
+    }
+  }
+  function onWrite(err) {
+    console.log("\nonWrite", err)
+    if (err) {
+      callback(err);
+    }
+    else {
+      read(null, onRead);
     }
   }
 }
