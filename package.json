@@ -1,13 +1,15 @@
 {
   "name": "js-git-node",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A sample CLI tool using js-git for node.js",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "git-clone": "clone.js"
+    "jsgit-clone": "clone.js",
+    "jsgit-checkout": "checkout.js",
+    "jsgit": "cli.js"
   },
   "repository": {
     "type": "git",
@@ -25,7 +27,7 @@
     "git-pkt-line": "0.0.1",
     "git-list-pack": "0.0.10",
     "min-stream": "0.0.4",
-    "git-hydrate-pack": "0.0.3",
+    "git-hydrate-pack": "0.0.4",
     "mkdirp": "~0.3.5"
   },
   "devDependencies": {},

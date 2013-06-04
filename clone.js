@@ -14,23 +14,41 @@ var bops = require('bops');
 var crypto = require('crypto');
 var streamToSink = require('min-stream-node/common.js').streamToSink;
 
-if (process.argv.length < 3) {
-  console.log("Usage: %s %s repo [target]\n", process.argv[0], process.argv[1]);
+var program = require('commander');
+
+program
+  .version(require('./package.json').version)
+  .usage('url [options]')
+  .option('-t, --target [target]', 'Set a custom target directory')
+  .option('-b, --bare', 'Bare clone')
+  .parse(process.argv);
+
+
+if (program.args.length !== 1) {
+  program.outputHelp();
   process.exit(1);
 }
 
-var options = urlParse(process.argv[2]);
+var options = urlParse(program.args[0]);
 options.port = options.port ? parseInt(options.port, 10) : 9418;
 
 if (options.protocol !== "git:") {
+  console.error("Invalid URL: " + JSON.stringify(program.args[0]));
   throw new Error("Sorry, only git:// protocol is implemented so far");
 }
 
-
 var baseExp = /([^\/.]*)(\.git)?$/;
-options.target = process.argv[3] || options.pathname.match(baseExp)[1];
+options.target = program.target || options.pathname.match(baseExp)[1];
 
-console.log("Cloning into '%s'...", options.target);
+var gitDir;
+if (program.bare) {
+  gitDir = options.target + ".git";
+  console.log("Cloning bare repo into '%s'...", gitDir);
+}
+else {
+  gitDir = pathJoin(options.target, ".git");
+  console.log("Cloning repo into '%s'...", options.target);
+}
 tcp.connect(options.hostname, options.port, function (err, socket) {
   if (err) throw err;
 
@@ -48,7 +66,6 @@ tcp.connect(options.hostname, options.port, function (err, socket) {
 
 function onStream(err, sources) {
   if (err) throw err;
-  var gitDir = pathJoin(options.target, ".git");
   var HEAD;
   Object.keys(sources.refs).forEach(function (ref) {
     var hash = sources.refs[ref];
@@ -78,6 +95,7 @@ function onStream(err, sources) {
   }, function (err) {
     if (err) throw err;
     console.log("Receiving objects: 100% (" + total + "/" + total + "), done.");
+    if (program.bare) return;
     checkout(gitDir, "HEAD", checkError);
   });
 }
@@ -202,7 +220,7 @@ function sha1(buf) {
   return crypto
     .createHash('sha1')
     .update(buf)
-    .digest('hex')
+    .digest('hex');
 }
 
 function hashToPath(gitDir, hash) {
@@ -265,9 +283,12 @@ function loadObject(gitDir, hash, callback) {
 }
 
 
+
 function checkout(gitDir, ref, callback) {
+  // Get the hash ref points to
   loadRef(gitDir, ref, function (err, hash) {
     if (err) return callback(err);
+    // Get the commit the hash points to
     loadObject(gitDir, hash, function (err, object) {
       if (err) return callback(err);
       object = parseObject(object);
