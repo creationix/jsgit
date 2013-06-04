@@ -78,6 +78,7 @@ function onStream(err, sources) {
   }, function (err) {
     if (err) throw err;
     console.log("Receiving objects: 100% (" + total + "/" + total + "), done.");
+    checkout(gitDir, "HEAD", checkError);
   });
 }
 
@@ -208,6 +209,21 @@ function hashToPath(gitDir, hash) {
   return pathJoin(gitDir, "objects", hash.substr(0, 2), hash.substr(2));
 }
 
+// Load the hash for a ref, supports recursive symbolic refs
+function loadRef(gitDir, ref, callback) {
+  fs.readFile(pathJoin(gitDir, ref), 'utf8', function (err, hash) {
+    if (err) return callback(err);
+    hash = hash.trim();
+    if (hash.substr(0, 5) === "ref: ") {
+      loadRef(gitDir, hash.substr(5), callback);
+    }
+    else {
+      callback(null, hash);
+    }
+  });
+}
+
+
 // Save an object to the git filesystem, callback(err, hash) when done
 function saveObject(gitDir, object, callback) {
   var body = bops.join([bops.from(object.type + " " + object.data.length + "\0"), object.data]);
@@ -222,12 +238,78 @@ function saveObject(gitDir, object, callback) {
   });
 }
 
-
 // load a git object by hash, callback(err, object) when done
 function loadObject(gitDir, hash, callback) {
   var path = hashToPath(gitDir, hash);
   fs.readFile(path, function (err, body) {
     if (err) return callback(err);
+    zlib.inflate(body, function (err, body) {
+      if (err) return callback(err);
+      if (sha1(body) !== hash) return callback(new Error("SHA1 mismatch for " + path));
+      var i = 0;
+      var start = i;
+      while (body[i++] !== 0x20);
+      var type = bops.to(bops.subarray(body, start, i - 1));
+      start = i;
+      while (body[i++] !== 0x00);
+      var size = parseInt(bops.to(bops.subarray(body, start, i - 1)), 10);
+      callback(null, {
+        hash: hash,
+        type: type,
+        size: size,
+        data: bops.subarray(body, i)
+      });
+    });
   });
 
 }
+
+
+function checkout(gitDir, ref, callback) {
+  loadRef(gitDir, ref, function (err, hash) {
+    if (err) return callback(err);
+    loadObject(gitDir, hash, function (err, object) {
+      if (err) return callback(err);
+      object = parseObject(object);
+      loadObject(gitDir, object.commit.tree, function (err, object) {
+        if (err) return callback(err);
+        object = parseObject(object);
+        loadTree(gitDir, dirname(gitDir), object.tree, callback);
+      });
+    });
+  });
+}
+
+function loadTree(gitDir, base, files, callback) {
+  var done = false;
+  function finish(err) {
+    if (done) return;
+    done = true;
+    callback(err);
+  }
+  var left = files.length;
+  files.forEach(function (file) {
+    loadObject(gitDir, file.hash, function (err, object) {
+      if (err) return finish(err);
+      var parsed = parseObject(object);
+      var path = pathJoin(base, file.path);
+      if (parsed.tree) {
+        loadTree(gitDir, path, parsed.tree, onDone);
+      }
+      else if (parsed.blob) {
+        mkdirp(dirname(path), function (err) {
+          if (err) return finish(err);
+          fs.writeFile(path, parsed.blob, {mode:file.mode}, onDone);
+        });
+      }
+      else {
+        finish(new Error("Invalid type found in tree: " + object.type));
+      }
+      function onDone(err) {
+        if (err) return finish(err);
+        if (!--left) finish();
+      }
+    });
+  });
+}
+
