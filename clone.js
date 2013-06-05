@@ -214,13 +214,13 @@ function FileRepo(path, bare) {
   this.gitDir = bare ? path + ".git" : pathJoin(path, '.git');
 }
 
-FileRepo.prototype.writeFile = function (path, data, callback) {
+FileRepo.prototype.writeFile = function (path, data, options, callback) {
   // console.log("writeFile", this, arguments);
   if (this.bare) return new Error("Cannot write working files in a bare repo");
   path = pathJoin(this.path, path);
   mkdirp(dirname(path), function (err) {
     if (err) return callback(err);
-    fs.writeFile(path, data, callback);
+    fs.writeFile(path, data, options, callback);
   });
 };
 
@@ -333,42 +333,31 @@ FileRepo.prototype.checkout = function (ref, callback) {
   this.readRef(ref, onRef);
 
   function onRef(err, hash) {
-    // console.log("onRef", arguments);
     if (err) return callback(err);
     self.readObject(hash, onCommit);
   }
 
   function onCommit(err, object) {
-    // console.log("onCommit", arguments);
     if (err) return callback(err);
     object = parseObject(object);
     self.readObject(object.commit.tree, onTree);
   }
 
   function onTree(err, object) {
-    // console.log("onTree", arguments);
     if (err) return callback(err);
     object = parseObject(object);
     self.loadTree("", object.tree, onFile, onDone);
   }
 
   function onFile(file) {
-    // console.log("onFile", arguments);
     files.push(file);
   }
 
   function onDone(err) {
-    // console.log("onDone", arguments);
     if (err) return callback(err);
     files.sort();
     self.writeIndex(files, callback);
   }
-};
-
-FileRepo.prototype.writeIndex = function (files, callback) {
-  // console.log("writeIndex", this, arguments);
-  files.sort();
-  callback(new Error("TODO: Implement writeIndex"));
 };
 
 FileRepo.prototype.loadTree = function (base, files, onFile, callback) {
@@ -404,16 +393,11 @@ FileRepo.prototype.loadTree = function (base, files, onFile, callback) {
       }
       else if (parsed.blob) {
         onFile(path);
-        mkdirp(dirname(path), onDir);
+        self.writeFile(path, parsed.blob, { mode: file.mode }, onSaved);
       }
       else {
         finish(new Error("Invalid type found in tree: " + object.type));
       }
-    }
-
-    function onDir(err) {
-      if (err) return finish(err);
-      self.writeFile(path, parsed.blob, { mode: file.mode }, onSaved);
     }
 
     function onSaved(err) {
@@ -424,3 +408,9 @@ FileRepo.prototype.loadTree = function (base, files, onFile, callback) {
 
 };
 
+FileRepo.prototype.writeIndex = function (files, callback) {
+  // console.log("writeIndex", this, arguments);
+  files.sort();
+  console.log(files);
+  callback(new Error("TODO: Implement writeIndex"));
+};
