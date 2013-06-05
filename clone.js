@@ -40,15 +40,9 @@ if (options.protocol !== "git:") {
 var baseExp = /([^\/.]*)(\.git)?$/;
 options.target = program.target || options.pathname.match(baseExp)[1];
 
-var gitDir;
-if (program.bare) {
-  gitDir = options.target + ".git";
-  console.log("Cloning bare repo into '%s'...", gitDir);
-}
-else {
-  gitDir = pathJoin(options.target, ".git");
-  console.log("Cloning repo into '%s'...", options.target);
-}
+var repo = new FileRepo(options.target, program.bare);
+console.log("Cloning repo into '%s'...", repo.path);
+
 tcp.connect(options.hostname, options.port, function (err, socket) {
   if (err) throw err;
 
@@ -74,9 +68,9 @@ function onStream(err, sources) {
       return;
     }
     if (/\^\{\}$/.test(ref)) return;
-    writeFile(pathJoin(gitDir, ref), hash + "\n");
+    repo.writeRef(ref, hash, checkError);
     if (hash === HEAD) {
-      writeFile(pathJoin(gitDir, "HEAD"), "ref: " + ref + "\n");
+      repo.writeSymbolicRef("HEAD", ref, checkError);
       HEAD = undefined;
     }
   });
@@ -89,14 +83,13 @@ function onStream(err, sources) {
     if (total === undefined) total = object.num + 1;
     ++num;
     process.stdout.write("Receiving objects: " + Math.round(100 * num / total) + "% (" + num + "/" + total + ")\r");
-    saveObject(gitDir, object, callback);
+    repo.writeObject(object, callback);
     // Stop reading when we've got all the objects.
     if (num === total) return false;
   }, function (err) {
     if (err) throw err;
     console.log("Receiving objects: 100% (" + total + "/" + total + "), done.");
-    if (program.bare) return;
-    checkout(gitDir, "HEAD", checkError);
+    if (!repo.bare) repo.checkout("HEAD", checkError);
   });
 }
 
@@ -208,14 +201,6 @@ function parseObject(item) {
   return obj;
 }
 
-function writeFile(path, data, callback) {
-  if (!callback) callback = checkError;
-  mkdirp(dirname(path), function (err) {
-    if (err) return callback(err);
-    fs.writeFile(path, data, callback);
-  });
-}
-
 function sha1(buf) {
   return crypto
     .createHash('sha1')
@@ -223,43 +208,85 @@ function sha1(buf) {
     .digest('hex');
 }
 
-function hashToPath(gitDir, hash) {
-  return pathJoin(gitDir, "objects", hash.substr(0, 2), hash.substr(2));
+function FileRepo(path, bare) {
+  this.bare = !!bare;
+  this.path = bare ? path + ".git" : path;
+  this.gitDir = bare ? path + ".git" : pathJoin(path, '.git');
 }
 
-// Load the hash for a ref, supports recursive symbolic refs
-function loadRef(gitDir, ref, callback) {
-  fs.readFile(pathJoin(gitDir, ref), 'utf8', function (err, hash) {
+FileRepo.prototype.writeFile = function (path, data, callback) {
+  // console.log("writeFile", this, arguments);
+  if (this.bare) return new Error("Cannot write working files in a bare repo");
+  path = pathJoin(this.path, path);
+  mkdirp(dirname(path), function (err) {
     if (err) return callback(err);
-    hash = hash.trim();
-    if (hash.substr(0, 5) === "ref: ") {
-      loadRef(gitDir, hash.substr(5), callback);
-    }
-    else {
-      callback(null, hash);
-    }
+    fs.writeFile(path, data, callback);
   });
-}
+};
 
+FileRepo.prototype.readFile = function (path, callback) {
+  // console.log("readFile", this, arguments);
+  if (this.bare) return new Error("Cannot read working files in a bare repo");
+  path = pathJoin(this.path, path);
+  fs.readFile(path, callback);
+};
+
+
+FileRepo.prototype.writeGitFile = function (path, data, callback) {
+  // console.log("writeGitFile", this, arguments);
+  path = pathJoin(this.gitDir, path);
+  mkdirp(dirname(path), function (err) {
+    if (err) return callback(err);
+    fs.writeFile(path, data, callback);
+  });
+};
+
+FileRepo.prototype.readGitFile = function (path, callback) {
+  // console.log("readGitFile", this, arguments);
+  path = pathJoin(this.gitDir, path);
+  fs.readFile(path, callback);
+};
+
+// Quick shared helper for load and save filepaths.
+FileRepo.prototype.hashToPath = function (hash) {
+  // console.log("hashToPath", this, arguments);
+  return pathJoin("objects", hash.substr(0, 2), hash.substr(2));
+};
+
+FileRepo.prototype.writeRef = function (ref, hash, callback) {
+  // console.log("writeRef", this, arguments);
+  this.writeGitFile(ref, hash + "\n", callback);
+};
+
+FileRepo.prototype.writeSymbolicRef = function (ref, target, callback) {
+  // console.log("writeSymbolicRef", this, arguments);
+  this.writeGitFile(ref, "ref: " + target + "\n", callback);
+};
 
 // Save an object to the git filesystem, callback(err, hash) when done
-function saveObject(gitDir, object, callback) {
+FileRepo.prototype.writeObject = function (object, callback) {
+  // console.log("writeObject", this, arguments);
   var body = bops.join([bops.from(object.type + " " + object.data.length + "\0"), object.data]);
   var hash = sha1(body);
-  var path = hashToPath(gitDir, hash);
+  var self = this;
+  if (object.hash && object.hash !== hash) {
+    return callback(new Error("SHA1 mismatch on object: " + object.hash + " != " + hash));
+  }
+  var path = this.hashToPath(hash);
   zlib.deflate(body, function (err, data) {
     if (err) return callback(err);
-    writeFile(path, data, function (err) {
+    self.writeGitFile(path, data, function (err) {
       if (err) return callback(err);
       callback(null, hash);
     });
   });
-}
+};
 
 // load a git object by hash, callback(err, object) when done
-function loadObject(gitDir, hash, callback) {
-  var path = hashToPath(gitDir, hash);
-  fs.readFile(path, function (err, body) {
+FileRepo.prototype.readObject = function (hash, callback) {
+  // console.log("readObject", this, arguments);
+  var path = this.hashToPath(hash);
+  this.readGitFile(path, function (err, body) {
     if (err) return callback(err);
     zlib.inflate(body, function (err, body) {
       if (err) return callback(err);
@@ -279,58 +306,121 @@ function loadObject(gitDir, hash, callback) {
       });
     });
   });
+};
 
-}
-
-
-
-function checkout(gitDir, ref, callback) {
-  // Get the hash ref points to
-  loadRef(gitDir, ref, function (err, hash) {
+// Load the hash for a ref, supports recursive symbolic refs
+FileRepo.prototype.readRef = function (ref, callback) {
+  // console.log("readRef", this, arguments);
+  var self = this;
+  this.readGitFile(ref, function (err, hash) {
     if (err) return callback(err);
-    // Get the commit the hash points to
-    loadObject(gitDir, hash, function (err, object) {
-      if (err) return callback(err);
-      object = parseObject(object);
-      loadObject(gitDir, object.commit.tree, function (err, object) {
-        if (err) return callback(err);
-        object = parseObject(object);
-        loadTree(gitDir, dirname(gitDir), object.tree, callback);
-      });
-    });
+    hash = hash.toString().trim();
+    if (hash.substr(0, 5) === "ref: ") {
+      self.readRef(hash.substr(5), callback);
+    }
+    else {
+      callback(null, hash);
+    }
   });
-}
+};
 
-function loadTree(gitDir, base, files, callback) {
+FileRepo.prototype.checkout = function (ref, callback) {
+  // console.log("checkout", this, arguments);
+  if (this.bare) return new Error("Cannot checkout in a bare repo");
+  var self = this;
+  var files = [];
+
+  this.readRef(ref, onRef);
+
+  function onRef(err, hash) {
+    // console.log("onRef", arguments);
+    if (err) return callback(err);
+    self.readObject(hash, onCommit);
+  }
+
+  function onCommit(err, object) {
+    // console.log("onCommit", arguments);
+    if (err) return callback(err);
+    object = parseObject(object);
+    self.readObject(object.commit.tree, onTree);
+  }
+
+  function onTree(err, object) {
+    // console.log("onTree", arguments);
+    if (err) return callback(err);
+    object = parseObject(object);
+    self.loadTree("", object.tree, onFile, onDone);
+  }
+
+  function onFile(file) {
+    // console.log("onFile", arguments);
+    files.push(file);
+  }
+
+  function onDone(err) {
+    // console.log("onDone", arguments);
+    if (err) return callback(err);
+    files.sort();
+    self.writeIndex(files, callback);
+  }
+};
+
+FileRepo.prototype.writeIndex = function (files, callback) {
+  // console.log("writeIndex", this, arguments);
+  files.sort();
+  callback(new Error("TODO: Implement writeIndex"));
+};
+
+FileRepo.prototype.loadTree = function (base, files, onFile, callback) {
+  // console.log("loadTree", this, arguments);
   var done = false;
+  var self = this;
+
   function finish(err) {
     if (done) return;
     done = true;
     callback(err);
   }
+
+  // Counter for the parallel file loads.
   var left = files.length;
+  function onDone(err) {
+    if (err) return finish(err);
+    left--;
+    if (!left) finish();
+  }
+
   files.forEach(function (file) {
-    loadObject(gitDir, file.hash, function (err, object) {
+    var parsed, path;
+
+    self.readObject(file.hash, onObject);
+
+    function onObject(err, object) {
       if (err) return finish(err);
-      var parsed = parseObject(object);
-      var path = pathJoin(base, file.path);
+      parsed = parseObject(object);
+      path = pathJoin(base, file.path);
       if (parsed.tree) {
-        loadTree(gitDir, path, parsed.tree, onDone);
+        self.loadTree(path, parsed.tree, onFile, onDone);
       }
       else if (parsed.blob) {
-        mkdirp(dirname(path), function (err) {
-          if (err) return finish(err);
-          fs.writeFile(path, parsed.blob, {mode:file.mode}, onDone);
-        });
+        onFile(path);
+        mkdirp(dirname(path), onDir);
       }
       else {
         finish(new Error("Invalid type found in tree: " + object.type));
       }
-      function onDone(err) {
-        if (err) return finish(err);
-        if (!--left) finish();
-      }
-    });
+    }
+
+    function onDir(err) {
+      if (err) return finish(err);
+      self.writeFile(path, parsed.blob, { mode: file.mode }, onSaved);
+    }
+
+    function onSaved(err) {
+      if (err) return finish(err);
+      onDone();
+    }
   });
-}
+
+};
 
