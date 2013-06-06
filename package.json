@@ -1,6 +1,6 @@
 {
   "name": "js-git-node",
-  "version": "0.0.3-1",
+  "version": "0.0.4",
   "description": "A sample CLI tool using js-git for node.js",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,7 @@
   "dependencies": {
     "commander": "~1.1.1",
     "min-stream-node": "0.0.3",
-    "git-fetch": "0.0.2",
+    "git-fetch": "0.0.3",
     "git-pkt-line": "0.0.1",
     "git-list-pack": "0.0.10",
     "min-stream": "0.0.4",

@@ -4,7 +4,7 @@ var program = require('commander');
 
 program
   .version(require('./package.json').version)
-  .command("clone [url] [options]", "Clone a remote repository from [url]")
-  .command("checkout [ref]", "Checkout working directory to a named branch or tag for [ref]")
+  .command("clone <repo>", "Clone a repository into a new directory")
+  .command("checkout <ref>", "Checkout a branch to the working tree")
   .parse(process.argv);
 

@@ -18,13 +18,13 @@ var program = require('commander');
 
 program
   .version(require('./package.json').version)
-  .usage('url [options]')
-  .option('-t, --target [target]', 'Set a custom target directory')
-  .option('-b, --bare', 'Bare clone')
+  .usage('[options] [--] <repo> [<dir>]')
+  .option('--bare', 'create a bare repository')
+  .option('-b, --branch <branch>', 'checkout <branch> instead of the remote\'s HEAD')
   .parse(process.argv);
 
 
-if (program.args.length !== 1) {
+if (program.args.length < 1 || program.args.length > 2) {
   program.outputHelp();
   process.exit(1);
 }
@@ -38,7 +38,17 @@ if (options.protocol !== "git:") {
 }
 
 var baseExp = /([^\/.]*)(\.git)?$/;
-options.target = program.target || options.pathname.match(baseExp)[1];
+options.target = program.args[1];
+if (!options.target) {
+  options.target = options.pathname.match(baseExp)[1];
+  if (program.bare) options.target += '.git';
+}
+
+if (program.branch) {
+  program.branch = "refs/heads/" + program.branch;
+  options.want = [program.branch];
+}
+
 
 var repo = new FileRepo(options.target, program.bare);
 console.log("Cloning repo into '%s'...", repo.path);
@@ -60,37 +70,46 @@ tcp.connect(options.hostname, options.port, function (err, socket) {
 
 function onStream(err, sources) {
   if (err) throw err;
-  var HEAD;
+  var HEAD = sources.refs.HEAD;
+  var left = 1;
+  function wait() {
+    left++;
+    return function (err) {
+      if (err) throw err;
+      if (!--left) onRefsWritten();
+    };
+  }
   Object.keys(sources.refs).forEach(function (ref) {
     var hash = sources.refs[ref];
-    if (ref === "HEAD") {
-      HEAD = hash;
-      return;
-    }
     if (/\^\{\}$/.test(ref)) return;
-    repo.writeRef(ref, hash, checkError);
-    if (hash === HEAD) {
-      repo.writeSymbolicRef("HEAD", ref, checkError);
+    if (ref === "HEAD") return;
+    repo.writeRef(ref, hash, wait);
+    if (ref === program.branch || hash === HEAD) {
+      repo.writeSymbolicRef("HEAD", ref, wait);
       HEAD = undefined;
     }
   });
-  consume(sources.line);
-  streamToSink(process.stdout, false)(sources.progress);
-  streamToSink(process.stderr, false)(sources.error);
-  var total;
-  var num = 0;
-  consume(sources.objects, function (object, callback) {
-    if (total === undefined) total = object.num + 1;
-    ++num;
-    process.stdout.write("Receiving objects: " + Math.round(100 * num / total) + "% (" + num + "/" + total + ")\r");
-    repo.writeObject(object, callback);
-    // Stop reading when we've got all the objects.
-    if (num === total) return false;
-  }, function (err) {
-    if (err) throw err;
-    console.log("Receiving objects: 100% (" + total + "/" + total + "), done.");
-    if (!repo.bare) repo.checkout("HEAD", checkError);
-  });
+  if (!--left) onRefsWritten();
+
+  function onRefsWritten() {
+    consume(sources.line);
+    streamToSink(process.stdout, false)(sources.progress);
+    streamToSink(process.stderr, false)(sources.error);
+    var total;
+    var num = 0;
+    consume(sources.objects, function (object, callback) {
+      if (total === undefined) total = object.num + 1;
+      ++num;
+      process.stdout.write("Receiving objects: " + Math.round(100 * num / total) + "% (" + num + "/" + total + ")\r");
+      repo.writeObject(object, callback);
+      // Stop reading when we've got all the objects.
+      if (num === total) return false;
+    }, function (err) {
+      if (err) throw err;
+      console.log("Receiving objects: 100% (" + total + "/" + total + "), done.");
+      if (!repo.bare) repo.checkout("HEAD", checkError);
+    });
+  }
 }
 
 function checkError(err) {
@@ -210,8 +229,8 @@ function sha1(buf) {
 
 function FileRepo(path, bare) {
   this.bare = !!bare;
-  this.path = bare ? path + ".git" : path;
-  this.gitDir = bare ? path + ".git" : pathJoin(path, '.git');
+  this.path = path;
+  this.gitDir = bare ? path : pathJoin(path, '.git');
 }
 
 FileRepo.prototype.writeFile = function (path, data, options, callback) {
