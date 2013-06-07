@@ -1,6 +1,6 @@
 {
   "name": "js-git-node",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A sample CLI tool using js-git for node.js",
   "main": "index.js",
   "scripts": {

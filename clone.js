@@ -49,7 +49,6 @@ if (program.branch) {
   options.want = [program.branch];
 }
 
-
 var repo = new FileRepo(options.target, program.bare);
 console.log("Cloning repo into '%s'...", repo.path);
 
@@ -70,7 +69,7 @@ tcp.connect(options.hostname, options.port, function (err, socket) {
 
 function onStream(err, sources) {
   if (err) throw err;
-  var HEAD = sources.refs.HEAD;
+  var HEAD = program.branch || sources.refs.HEAD;
   var left = 1;
   function wait() {
     left++;
