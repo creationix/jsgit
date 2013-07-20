@@ -47,12 +47,29 @@ require('git-fs-db')(fs, { bare: true, init: true }, function (err, db) {
   if (err) throw err;
   tcp.connect(options.port, options.hostname, function (err, socket) {
     if (err) throw err;
-    socket.sink(gitPull(socket, db, options))(function (err, head) {
+    socket.sink(
+      trace("->",
+        gitPull(trace("->", socket), db, options)
+      )
+    )(function (err, head) {
       if (err) throw err;
       console.log("Cloned to", head);
     });
   });
 });
+
+var inspect = require('util').inspect;
+
+function trace(prefix, stream) {
+  return { read: read, abort: stream.abort };
+  function read(callback) {
+    stream.read(function (err, item) {
+      console.log(prefix, inspect("" + item, {colors:true}));
+      return callback(err, item);
+    });
+  }
+}
+
 
 
 /*
@@ -120,7 +137,7 @@ function onStream(err, sources) {
   }
 }
 
-function checkError(err) {s
+function checkError(err) {
   if (err) throw err;
 }
 
@@ -205,7 +222,7 @@ var parsers = {
     var items = {};
     while (i < l) {
       var start = i;
-      while (data[i++] !==   0x20);
+      while (data[i++] !== 0x20);
       key = bops.to(bops.subarray(data, start, i - 1));
       start = i;
       while (data[i++] !== 0x0a);
