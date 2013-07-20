@@ -22,9 +22,9 @@
   ],
   "dependencies": {
     "commander": "~1.1.1",
-    "bops": "0.0.6",
-    "simple-fs": "0.0.2",
-    "git-fs-db": "0.0.2"
+    "bops": "~0.0.6",
+    "simple-fs": "~0.0.3",
+    "git-fs-db": "~0.0.2"
   },
   "devDependencies": {},
   "author": "Tim Caswell <tim@creationix.com>",

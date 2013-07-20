@@ -43,18 +43,22 @@ options.target = pathResolve(process.cwd(), options.target);
 var tcp = require('simple-tcp/tcp.js');
 var gitPull = require('git-pull/git-pull.js');
 var fs = require('simple-fs')(options.target);
+var each = require('simple-stream-helpers/each.js');
 require('git-fs-db')(fs, { bare: true, init: true }, function (err, db) {
   if (err) throw err;
   tcp.connect(options.port, options.hostname, function (err, socket) {
     if (err) throw err;
-    socket.sink(
-      trace("->",
-        gitPull(trace("->", socket), db, options)
-      )
-    )(function (err, head) {
+    var out = gitPull(socket, db, options);
+    socket.sink(out)(function (err, head) {
       if (err) throw err;
       console.log("Cloned to", head);
     });
+    each(out.progress, function (line) {
+      console.log("progress", inspect(line));
+    })(console.log);
+    each(out.errorStream, function (line) {
+      console.error("error", inspect(line));
+    })(console.log);
   });
 });
 
