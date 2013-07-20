@@ -1,19 +1,7 @@
 #!/usr/bin/env node
 
-var tcp = require('min-stream-node/tcp.js');
-var fetch = require('git-fetch');
-var cat = require('min-stream/cat.js');
-var pktLine = require('git-pkt-line');
 var urlParse = require('url').parse;
-var pathJoin = require('path').join;
-var dirname = require('path').dirname;
-var mkdirp = require('mkdirp');
-var fs = require('fs');
-var zlib = require('zlib');
-var bops = require('bops');
-var crypto = require('crypto');
-var streamToSink = require('min-stream-node/common.js').streamToSink;
-
+var pathResolve = require('path').resolve;
 var program = require('commander');
 
 program
@@ -48,6 +36,27 @@ if (program.branch) {
   program.branch = "refs/heads/" + program.branch;
   options.want = [program.branch];
 }
+
+options.target = pathResolve(process.cwd(), options.target);
+
+
+var tcp = require('simple-tcp/tcp.js');
+var gitPull = require('git-pull/git-pull.js');
+var fs = require('simple-fs')(options.target);
+require('git-fs-db')(fs, { bare: true, init: true }, function (err, db) {
+  if (err) throw err;
+  tcp.connect(options.port, options.hostname, function (err, socket) {
+    if (err) throw err;
+    socket.sink(gitPull(socket, db, options))(function (err, head) {
+      if (err) throw err;
+      console.log("Cloned to", head);
+    });
+  });
+});
+
+
+/*
+
 
 var repo = new FileRepo(options.target, program.bare);
 console.log("Cloning repo into '%s'...", repo.path);
@@ -111,7 +120,7 @@ function onStream(err, sources) {
   }
 }
 
-function checkError(err) {
+function checkError(err) {s
   if (err) throw err;
 }
 
@@ -196,7 +205,7 @@ var parsers = {
     var items = {};
     while (i < l) {
       var start = i;
-      while (data[i++] !== 0x20);
+      while (data[i++] !==   0x20);
       key = bops.to(bops.subarray(data, start, i - 1));
       start = i;
       while (data[i++] !== 0x0a);
@@ -550,3 +559,4 @@ FileRepo.prototype.writeIndex = function (files, callback) {
     self.writeGitFile("index", bops.join([buf, checksum]), callback);
   }
 };
+*/

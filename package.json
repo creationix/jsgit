@@ -22,14 +22,9 @@
   ],
   "dependencies": {
     "commander": "~1.1.1",
-    "min-stream-node": "0.0.3",
-    "git-fetch": "0.0.3",
-    "git-pkt-line": "0.0.1",
-    "git-list-pack": "0.0.10",
-    "min-stream": "0.0.4",
-    "git-hydrate-pack": "0.0.4",
-    "mkdirp": "~0.3.5",
-    "bops": "0.0.6"
+    "bops": "0.0.6",
+    "simple-fs": "0.0.2",
+    "git-fs-db": "0.0.2"
   },
   "devDependencies": {},
   "author": "Tim Caswell <tim@creationix.com>",
