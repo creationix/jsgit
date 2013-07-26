@@ -25,8 +25,8 @@
     "bops": "~0.0.6",
     "simple-fs": "~0.0.3",
     "git-fs-db": "~0.0.2",
-    "simple-tcp": "0.0.1",
-    "git-pull": "~0.1.0"
+    "simple-tcp": "~0.0.1",
+    "jsgit-pull": "~0.0.2"
   },
   "devDependencies": {},
   "author": "Tim Caswell <tim@creationix.com>",
