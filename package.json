@@ -26,7 +26,8 @@
     "simple-fs": "~0.0.3",
     "git-fs-db": "~0.0.2",
     "simple-tcp": "~0.0.1",
-    "jsgit-pull": "~0.0.2"
+    "jsgit-pull": "~0.0.2",
+    "simple-stream-helpers": "0.0.3"
   },
   "devDependencies": {},
   "author": "Tim Caswell <tim@creationix.com>",
