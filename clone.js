@@ -41,7 +41,7 @@ options.target = pathResolve(process.cwd(), options.target);
 
 
 var tcp = require('simple-tcp/tcp.js');
-var gitPull = require('git-pull/git-pull.js');
+var gitPull = require('jsgit-pull/git-pull.js');
 var fs = require('simple-fs')(options.target);
 var each = require('simple-stream-helpers/each.js');
 require('git-fs-db')(fs, { bare: true, init: true }, function (err, db) {
