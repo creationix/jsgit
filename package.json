@@ -4,9 +4,9 @@
   "description": "A sample CLI tool using js-git for node.js",
   "main": "index.js",
   "bin": {
-    "jsgit-clone": "clone.js",
-    "jsgit-ls-remote": "ls-remote.js",
-    "jsgit": "cli.js"
+    "jsgit-clone": "./bin/clone.js",
+    "jsgit-ls-remote": "./bin/ls-remote.js",
+    "jsgit": "./bin/cli.js"
   },
   "repository": {
     "type": "git",
@@ -19,11 +19,8 @@
   ],
   "dependencies": {
     "commander": "~2.0.0",
-    "bops": "~0.0.6",
-    "ssh2": "~0.2.11",
-    "gen-run": "~0.1.0",
-    "push-to-pull": "~0.1.0",
-    "js-git": "~0.2.0"
+    "js-git": "~0.2.0",
+    "js-git-node-platform": "~0.2.0"
   },
   "devDependencies": {},
   "author": "Tim Caswell <tim@creationix.com>",
