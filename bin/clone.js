@@ -18,6 +18,7 @@ program
   .usage('[options] [--] <url> [<dir>]')
   .option('--bare', 'create a bare repository')
   .option('-b, --branch <branch>', 'checkout <branch> instead of the remote\'s HEAD')
+  .option('-t, --tag <tag>', 'checkout <tag> instead of the remote\'s HEAD')
   .parse(process.argv);
 
 
@@ -39,9 +40,12 @@ if (!opts.target) {
   if (program.bare) opts.target += '.git';
 }
 
+program.ref = "HEAD";
 if (program.branch) {
-  program.branch = "refs/heads/" + program.branch;
-  opts.want = [program.branch];
+  program.ref = "refs/heads/" + program.branch;
+}
+else if (program.tag) {
+  program.ref = "refs/tags/" + program.tag;
 }
 
 opts.target = pathResolve(process.cwd(), opts.target);
@@ -69,9 +73,15 @@ parallelData({
       repo.importRefs(result.pack.refs),
       repo.unpack(result.pack, config)
     ),
-    connection.close()
+    connection.close(),
+    function (callback) {
+      if (repo.bare) return callback();
+      repo.checkout(program.ref, callback);
+    }
   )(function (err) {
     if (err) throw err;
+
     console.log("DONE");
   });
 });
+
