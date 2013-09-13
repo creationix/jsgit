@@ -1,12 +1,12 @@
-git-cli
-=======
+jsgit
+=====
 
 A command-line git client powered by js-git and node.js
 
 ## Install
 
 ```sh
-> npm install -g git-cli
+> npm install -g jsgit
 ```
 
 ## Usage
