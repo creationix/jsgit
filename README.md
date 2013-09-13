@@ -1,7 +1,7 @@
 js-git-node
 ===========
 
-CLI tools for using js-git from node.js
+A command-line git client powered by js-git and node.js
 
 ## Install
 
