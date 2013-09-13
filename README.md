@@ -1,12 +1,12 @@
-js-git-node
-===========
+git-cli
+=======
 
 A command-line git client powered by js-git and node.js
 
 ## Install
 
 ```sh
-> npm install -g js-git-node
+> npm install -g git-cli
 ```
 
 ## Usage
