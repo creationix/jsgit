@@ -1,31 +1,32 @@
 {
-  "name": "js-git-node",
-  "version": "0.2.0",
-  "description": "A sample CLI tool using js-git for node.js",
+  "name": "jsgit",
+  "version": "0.3.0",
+  "description": "A command-line git client powered by js-git and node.js",
   "main": "index.js",
   "bin": {
     "jsgit-clone": "./bin/clone.js",
+    "jsgit-fetch": "./bin/fetch.js",
+    "jsgit-log": "./bin/log.js",
+    "jsgit-switch": "./bin/switch.js",
+    "jsgit-dump": "./bin/dump.js",
     "jsgit-ls-remote": "./bin/ls-remote.js",
     "jsgit": "./bin/cli.js"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/creationix/js-git-node.git"
+    "url": "git://github.com/creationix/jsgit.git"
   },
   "keywords": [
-    "jsgit",
-    "cli",
-    "min-stream"
+    "js-git"
   ],
   "dependencies": {
     "commander": "~2.0.0",
-    "js-git": "~0.2.3",
-    "js-git-node-platform": "~0.2.1"
+    "git-node": "~0.0.1"
   },
   "devDependencies": {},
   "author": "Tim Caswell <tim@creationix.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/creationix/js-git-node/issues"
+    "url": "https://github.com/creationix/js-git/issues"
   }
 }
