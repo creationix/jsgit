@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 var git = require('git-node');
 var program = require('commander');
-var existsSync = require('fs').existsSync;
-var readFileSync = require('fs').readFileSync;
-var path = require('path');
 
 program
   .usage('[options] [--] [<ref>]')
@@ -19,13 +16,7 @@ if (program.args.length > 1) {
 if (program.limit) program.limit = parseInt(program.limit, 10);
 
 var ref = program.args[0] || "HEAD";
-var target = path.resolve(process.cwd(), program.gitDir || '.');
-var head = path.join(target, "HEAD");
-if (!(existsSync(head) && (/^ref: /).test(readFileSync(head, "utf8")))) {
-  console.error("Can't find bare repo at %s", target);
-  process.exit(-1);
-}
-
+var target = require('./root.js')(program);
 
 var repo = git.repo(target);
 repo.logWalk(ref, function (err, log) {
