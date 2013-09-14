@@ -1,26 +1,15 @@
 #!/usr/bin/env node
-// Bootstrap the platform to run on node.js
-require('js-git/lib/platform.js')(require('js-git-node-platform'));
-
-// Load the libraries
-var urlParse = require('url').parse;
+var git = require('git-node');
 var program = require('commander');
-var autoProto = require('js-git/protocols/auto.js');
-var fsDb = require('js-git/lib/fs-db.js');
-var wrap = require('js-git/lib/repo.js');
-var serial = require('js-git/helpers/serial.js');
-var parallel = require('js-git/helpers/parallel.js');
-var parallelData = require('js-git/helpers/parallel-data.js');
-var pathResolve = require('path').resolve;
+var basename = require('path').basename;
+var existsSync = require('fs').existsSync;
 
 program
-  .version(require('js-git/package.json').version)
   .usage('[options] [--] <url> [<dir>]')
-  .option('--bare', 'create a bare repository')
-  .option('-b, --branch <branch>', 'checkout <branch> instead of the remote\'s HEAD')
-  .option('-t, --tag <tag>', 'checkout <tag> instead of the remote\'s HEAD')
+  .option('--ref <branch/tag/ref>', 'checkout to specefic branch, tag, or ref')
+  .option('--depth <num>', 'do a shallow clone with num commits deep')
+  .option('-q', 'Be quiet; don\t show progress')
   .parse(process.argv);
-
 
 if (program.args.length < 1 || program.args.length > 2) {
   program.outputHelp();
@@ -28,60 +17,32 @@ if (program.args.length < 1 || program.args.length > 2) {
 }
 
 var url = program.args[0];
-var opts = urlParse(url);
-if (!opts.protocol) {
-  opts = urlParse("ssh://" + url);
+var remote = git.remote(url);
+var target = program.args[1] || basename(remote.pathname, ".git") + ".git";
+if (existsSync(target)) {
+  console.error("Target already exists: %s", target);
+  process.exit(-1);
+}
+var repo = git.repo(target);
+var opts = {};
+if (!program.Q) opts.onProgress = onProgress;
+if (program.ref) opts.want = program.ref;
+if (program.depth) opts.depth = parseInt(program.depth, 10);
+if (!program.Q) console.log("Cloning %s to %s..", url, target);
+repo.fetch(remote, opts, onDone);
+
+function onProgress(progress) {
+  process.stderr.write(progress);
 }
 
-var baseExp = /([^\/.]*)(\.git)?$/;
-opts.target = program.args[1];
-if (!opts.target) {
-  opts.target = opts.pathname.match(baseExp)[1];
-  if (program.bare) opts.target += '.git';
-}
-
-program.ref = "HEAD";
-if (program.branch) {
-  program.ref = "refs/heads/" + program.branch;
-}
-else if (program.tag) {
-  program.ref = "refs/tags/" + program.tag;
-}
-
-opts.target = pathResolve(process.cwd(), opts.target);
-
-var connection = autoProto(opts);
-var repo = wrap(fsDb(opts.target, opts.bare));
-
-var config = {
-  includeTag: true,
-  onProgress: function (data) {
-    process.stdout.write(data);
-  },
-  onError: function (data) {
-    process.stderr.write(data);
+function onDone() {
+  if (program.ref) {
+    repo.resolveHashish(program.ref, function (err, hash) {
+      if (err) throw err;
+      repo.updateHead(hash, function (err) {
+        if (err) throw err;
+      });
+    });
   }
-};
-
-parallelData({
-  init: repo.init(),
-  pack: connection.fetch(config),
-}, function (err, result) {
-  if (err) throw err;
-  serial(
-    parallel(
-      repo.importRefs(result.pack.refs),
-      repo.unpack(result.pack, config)
-    ),
-    connection.close(),
-    function (callback) {
-      if (repo.bare) return callback();
-      repo.checkout(program.ref, callback);
-    }
-  )(function (err) {
-    if (err) throw err;
-
-    console.log("DONE");
-  });
-});
-
+  if (!program.Q) console.log("Done.");
+}
