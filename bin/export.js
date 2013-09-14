@@ -32,7 +32,7 @@ function onEntry(err, entry) {
   if (!entry) return;
   var path = pathJoin(target, entry.path);
   if (!program.Q) {
-    var colorPath = path.replace(/\//g, "\x1B[1;34m/\x1B[0;34m") + "\x1B[0m";
+    var colorPath = "\x1B[34m" + path.replace(/\//g, "\x1B[1;34m/\x1B[0;34m") + "\x1B[0m";
     console.log("%s %s", entry.hash, colorPath);
   }
   if (entry.type === "tree") {
