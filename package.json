@@ -4,11 +4,10 @@
   "description": "A command-line git client powered by js-git and node.js",
   "main": "index.js",
   "bin": {
-    "jsgit-clone": "./bin/clone.js",
     "jsgit-fetch": "./bin/fetch.js",
     "jsgit-log": "./bin/log.js",
     "jsgit-switch": "./bin/switch.js",
-    "jsgit-dump": "./bin/dump.js",
+    "jsgit-export": "./bin/export.js",
     "jsgit-ls-remote": "./bin/ls-remote.js",
     "jsgit": "./bin/cli.js"
   },
