@@ -6,7 +6,6 @@
   "bin": {
     "jsgit-fetch": "./bin/fetch.js",
     "jsgit-log": "./bin/log.js",
-    "jsgit-switch": "./bin/switch.js",
     "jsgit-export": "./bin/export.js",
     "jsgit-ls-remote": "./bin/ls-remote.js",
     "jsgit": "./bin/cli.js"
