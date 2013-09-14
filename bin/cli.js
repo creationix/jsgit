@@ -8,7 +8,6 @@ program
   .command("fetch <url>", "Clone or fetch updates from remote")
   .command("log", "Show local history")
   .command("export <target>", "Export tree at HEAD as real files to target")
-  .command("switch <branch>", "Switch branch HEAD points to")
   .parse(process.argv);
 
 if (process.argv.length < 3) {
