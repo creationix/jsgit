@@ -8,7 +8,7 @@ program
   .usage('[options] [--] <url> [<dir>]')
   .option('--ref <branch/tag/ref>', 'checkout to specefic branch, tag, or ref')
   .option('--depth <num>', 'do a shallow clone with num commits deep')
-  .option('-q', 'Be quiet; don\t show progress')
+  .option('-q', 'Be quiet; don\'t show progress')
   .parse(process.argv);
 
 if (program.args.length < 1 || program.args.length > 2) {
